@@ -57,6 +57,7 @@ pub struct Devices {
     adc: Option<(usize, Arc<Mutex<Adc>>)>,
     xpp_adc: Option<Arc<Mutex<fujimod_emulator_xpp::adc::Converter>>>,
     usb: Option<Arc<Mutex<Dwc3>>>,
+    usb_presence: Option<Arc<std::sync::atomic::AtomicBool>>,
     pub frames: BTreeMap<usize, Frame>,
     pub outputs: BTreeMap<usize, serde_json::Value>,
 }
@@ -365,7 +366,12 @@ impl Devices {
             .unwrap())
     }
     pub fn usb_link(&self, now: u64, connected: bool) -> Result<(), String> {
-        self.usb_model()?.link(now, connected)
+        self.usb_model()?.link(now, connected)?;
+        // The condition strap the stock USB task reads follows the cable.
+        if let Some(presence) = &self.usb_presence {
+            presence.store(connected, std::sync::atomic::Ordering::SeqCst);
+        }
+        Ok(())
     }
     pub fn usb_reset(&self, now: u64) -> Result<(), String> {
         self.usb_model()?.bus_reset(now)
@@ -435,6 +441,33 @@ impl Devices {
         self.windows.push((base, base + 0x604, id));
         Ok(())
     }
+    pub fn sd_host(
+        &mut self,
+        host: crate::definition::SdHost,
+        files: &[(String, Vec<u8>)],
+    ) -> Result<(), String> {
+        let base = host.options.base;
+        if self
+            .windows
+            .iter()
+            .any(|&(lo, hi, _)| base < hi && lo < base.saturating_add(0x1000))
+        {
+            return Err("Overlapping XP4 SD host".into());
+        }
+        let card = fujimod_emulator_storage::fat::format(&host.card, files)?;
+        let contacts = fujimod_emulator_devices::parts::card_contacts::Contacts::new(true, false);
+        let model = fujimod_emulator_xp4_io::sd::Controller::new(
+            host.options,
+            card,
+            contacts,
+            host.irq
+                .map(fujimod_emulator_devices::bus::InterruptLine::Shared),
+        )?;
+        let id = self.models.len();
+        self.models.push(Some(Box::new(model)));
+        self.windows.push((base, base + 0x1000, id));
+        Ok(())
+    }
     pub fn sd_clocks(&mut self, words: &[(u64, u64)]) -> Result<(), String> {
         if words.iter().any(|&(address, _)| {
             self.windows
@@ -500,6 +533,7 @@ impl Devices {
             return Err("Overlapping XP4 USB condition register".into());
         }
         let model = fujimod_emulator_xp4_io::usb_condition::UsbCondition::new(base, present)?;
+        self.usb_presence = Some(model.presence());
         let id = self.models.len();
         self.windows.push((base, base + 4, id));
         self.models.push(Some(Box::new(model)));
@@ -552,7 +586,8 @@ impl Devices {
             }),
             read_gate,
         );
-        let command = sensor::Command::new(command_base, sensor.clone(), command_ticks)?;
+        let command =
+            sensor::Command::new(command_base, sensor.clone(), command_ticks)?.with_retained_words();
         let mut receiver = slvs::Receiver::new(
             sensor,
             slvs::Wiring {
@@ -598,7 +633,7 @@ impl Devices {
                     ready: 0x2e8,
                     max_offset: 0x2e8,
                     write_limit: 0x2e4,
-                    enables: [0x100, 0],
+                    enables: [0x3ff, 0x3df],
                     causes: [0x100, 0],
                     outputs: vec![Output {
                         enable_word: 0,
@@ -650,6 +685,7 @@ impl Devices {
             adc: None,
             xpp_adc: None,
             usb: None,
+            usb_presence: None,
             frames: BTreeMap::new(),
             outputs: BTreeMap::new(),
         }
@@ -778,6 +814,7 @@ impl Devices {
             adc: None,
             xpp_adc: None,
             usb: None,
+            usb_presence: None,
             frames: BTreeMap::new(),
             outputs: BTreeMap::new(),
             windows: vec![

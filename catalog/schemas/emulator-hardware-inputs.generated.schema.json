@@ -219,6 +219,13 @@
           ],
           "description": "Declared SD card in the slot at power-on."
         },
+        "sd_cards": {
+          "description": "Declared SD cards in the slots of the SD hosts at power-on.",
+          "items": {
+            "$ref": "#/$defs/ResetSdSlotCard"
+          },
+          "type": "array"
+        },
         "sensor_frame": {
           "anyOf": [
             {
@@ -316,6 +323,17 @@
             }
           ],
           "description": "Declared USB port: the cable's VBUS pin and the link speed a host\nnegotiates."
+        },
+        "usb_phy_input": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ResetUsbPhy"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Declared USB PHY programming-port state."
         },
         "zone_statistics": {
           "anyOf": [
@@ -2275,6 +2293,27 @@
       ],
       "type": "object"
     },
+    "ResetSdSlotCard": {
+      "additionalProperties": false,
+      "description": "The card in the slot of one SD host at power-on.",
+      "properties": {
+        "card": {
+          "$ref": "#/$defs/ResetSdCardInput",
+          "description": "The card."
+        },
+        "host_base": {
+          "description": "Base of the SD host whose slot holds the card.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "card",
+        "host_base"
+      ],
+      "type": "object"
+    },
     "ResetSelect": {
       "additionalProperties": false,
       "description": "Declared select facts.",
@@ -2978,6 +3017,38 @@
         "vbus_bank",
         "vbus_pin",
         "speed"
+      ],
+      "type": "object"
+    },
+    "ResetUsbPhy": {
+      "additionalProperties": false,
+      "description": "USB PHY programming-port state at reset: the 32 indexed register bytes and\nthe parallel-interface configuration word.",
+      "properties": {
+        "basis": {
+          "description": "Declared basis.",
+          "type": "string"
+        },
+        "parallel": {
+          "description": "Parallel-interface configuration word.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "registers": {
+          "description": "Register bytes selected by the control word's index.",
+          "items": {
+            "format": "uint8",
+            "maximum": 255,
+            "minimum": 0,
+            "type": "integer"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "basis",
+        "parallel",
+        "registers"
       ],
       "type": "object"
     },
