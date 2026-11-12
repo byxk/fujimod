@@ -2795,6 +2795,7 @@ class HardwareImagingRegisters(TypedDict, total=False):
     error_irqs: Required[list[int]]
     input_buffer: Required[HardwareInputBuffer]
     normal_irqs: Required[list[int]]
+    raw_dma_irqs: NotRequired[list[int] | None]
     receiver_base: Required[int]
     reset_ticks: Required[int]
     timing_irqs: Required[list[int]]
