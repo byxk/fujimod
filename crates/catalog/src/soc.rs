@@ -369,7 +369,8 @@ pub enum BlockHardware {
     tsify(hashmap_as_object, missing_as_null)
 )]
 pub enum PictureLayout {
-    /// Blue, green, red and straight-alpha bytes.
+    /// Blue, green, red and straight-alpha bytes; a pixel whose color bytes are all zero is
+    /// not drawn, whatever its alpha byte holds.
     Bgra8888Straight,
 }
 

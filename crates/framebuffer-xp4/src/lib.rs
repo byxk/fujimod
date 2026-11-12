@@ -6,6 +6,10 @@ use fujimod_framebuffer::{
 /// Selected by the processor graph; no implicit pixel-format fallback.
 #[derive(Clone, Copy)]
 pub enum Picture {
+    /// BGRA with straight alpha, except that a pixel whose color bytes are all zero is not
+    /// drawn whatever its alpha byte holds: observed on an X-T3 5.11, opaque black (alpha
+    /// 0xff) and 50 % black (alpha 0x80) picture pixels left the live view below them
+    /// unchanged, while opaque white pixels covered it.
     Bgra8888Straight,
 }
 /// Explicit linear video transport; hardware packing is not inferred from RAM.
@@ -54,7 +58,7 @@ impl Decoder<'_> {
             if self.r(0x50) & !0xfff != 0x10000 {
                 return Err("Unsupported XP4 LCDC raw picture mode".into());
             }
-            (source, (self.r(0x50) & 0xfff) * 4, 0x54, PixelOrder::Bgra)
+            (source, (self.r(0x50) & 0xfff) * 4, 0x54, PixelOrder::BgraBlackKeyed)
         };
         if self.r(geometry + 0x10) != 0 || self.r(geometry + 0x14) != 0 {
             return Err("Unsupported XP4 LCDC picture crop or fractional phase".into());
@@ -166,5 +170,68 @@ mod tests {
         assert_eq!(&rgba[..8], &[10, 20, 30, 255, 10, 20, 30, 255]);
         regs[8 / 4] |= 2;
         assert!(decode(&regs, Some(Picture::Bgra8888Straight), None).is_err());
+    }
+    /// Observed on an X-T3 5.11, a picture over the REC live view: pixels written opaque
+    /// black (0xff000000) and 50 % black (0x80000000) left the live view unchanged, while
+    /// opaque white pixels covered it. A straight-alpha law drew black bands the camera never
+    /// showed.
+    #[test]
+    fn black_picture_pixels_leave_the_video_below_them_visible() {
+        let mut regs = vec![0; 0x604 / 4];
+        for (o, v) in [
+            (4, 1),
+            (8, 0x11010),
+            (0x14, 4),
+            (0x20, 2),
+            (0x44, 16),
+            (0x4c, 16),
+            (0x50, 0x10004),
+            (0x54, 0x20004),
+            (0x5c, 0x20004),
+            (0x60, 0x10001000),
+            (0x168, 64),
+            (0x16c, 2),
+            (0x170, 0x20004),
+            (0x178, 0x20004),
+            (0x17c, 0x10001000),
+        ] {
+            regs[o / 4] = v;
+        }
+        let picture: [[u8; 4]; 4] = [
+            [0, 0, 0, 255],
+            [0, 0, 0, 128],
+            [255, 255, 255, 255],
+            [8, 8, 8, 255],
+        ];
+        let mut ram = vec![0u8; 128];
+        for row in 0..2 {
+            for (n, pixel) in picture.iter().enumerate() {
+                ram[16 + row * 16 + n * 4..][..4].copy_from_slice(pixel);
+            }
+        }
+        for row in 0..2 {
+            ram[64 + row * 16..][..8]
+                .copy_from_slice(&[126, 126, 128, 128, 126, 126, 128, 128]);
+        }
+        let read = |a: u64, n: usize| Ok(ram[a as usize..a as usize + n].to_vec());
+        let out = decode(&regs, Some(Picture::Bgra8888Straight), Some(Video::YyCbCr422))
+            .unwrap()
+            .unwrap();
+        let rgba = out.render(read).unwrap();
+        regs[8 / 4] = 0x10010;
+        let video = decode(&regs, Some(Picture::Bgra8888Straight), Some(Video::YyCbCr422))
+            .unwrap()
+            .unwrap()
+            .render(read)
+            .unwrap();
+        let gray = &video[..4];
+        assert_ne!(gray, [0, 0, 0, 255]);
+        for row in 0..2 {
+            let pixels = &rgba[row * 16..][..16];
+            assert_eq!(&pixels[..4], gray, "opaque black is not drawn");
+            assert_eq!(&pixels[4..8], gray, "50 % black is not drawn");
+            assert_eq!(&pixels[8..12], [255, 255, 255, 255]);
+            assert_eq!(&pixels[12..16], [8, 8, 8, 255]);
+        }
     }
 }

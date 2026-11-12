@@ -7,6 +7,9 @@ pub enum PixelOrder {
     Bgra,
     Argb,
     Abgr,
+    /// Blue, green, red and alpha bytes in which a pixel with zero color bytes is
+    /// transparent whatever its alpha byte holds.
+    BgraBlackKeyed,
     /// Packed 4:2:2 transport, two luma then Cb/Cr.
     YyCbCr,
 }
@@ -26,6 +29,8 @@ impl PixelOrder {
             Self::Bgra => [b[2], b[1], b[0], b[3]],
             Self::Argb => [b[1], b[2], b[3], b[0]],
             Self::Abgr => [b[3], b[2], b[1], b[0]],
+            Self::BgraBlackKeyed if b[..3] == [0, 0, 0] => [0, 0, 0, 0],
+            Self::BgraBlackKeyed => [b[2], b[1], b[0], b[3]],
             Self::YyCbCr => {
                 let y = (b[0] as i32 - 16).max(0) * 298;
                 let cb = b[1] as i32 - 128;

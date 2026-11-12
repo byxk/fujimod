@@ -19376,7 +19376,7 @@
       "oneOf": [
         {
           "const": "bgra8888-straight",
-          "description": "Blue, green, red and straight-alpha bytes.",
+          "description": "Blue, green, red and straight-alpha bytes; a pixel whose color bytes are all zero is\nnot drawn, whatever its alpha byte holds.",
           "type": "string"
         }
       ]
