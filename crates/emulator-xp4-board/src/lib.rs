@@ -10,6 +10,8 @@ pub mod observation;
 use observation::Call;
 mod devices;
 mod jpeg;
+mod dsp;
+mod still;
 mod timer;
 use fujimod_emulator::board::discovery::Discovery;
 use fujimod_emulator::board::harness::arm32 as driver_guard;
@@ -1130,6 +1132,8 @@ impl Session {
             countdown_timers,
             countdown_dials,
             jpeg_encoder,
+            still_engines,
+            dsp,
             usb_condition,
             instructions_per_tick,
             usb,
@@ -1697,6 +1701,16 @@ impl Session {
             devices
                 .get_or_insert_with(devices::Devices::empty)
                 .jpeg_encoder(&encoder)?;
+        }
+        for engine in &still_engines {
+            devices
+                .get_or_insert_with(devices::Devices::empty)
+                .still_engine(engine)?;
+        }
+        if let Some(wiring) = dsp {
+            devices
+                .get_or_insert_with(devices::Devices::empty)
+                .dsp(&wiring)?;
         }
         if let Some((base, present)) = usb_condition {
             devices
