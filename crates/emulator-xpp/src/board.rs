@@ -1,7 +1,7 @@
 //! X-Processor Pro topology on the shared native execution graph.
 //! The caller supplies checked wiring, assets, and physical contact inputs.
 use crate::{
-    adc, blocks, boot, clocks, display, dram, encoder, face, flash, h264, i2c, imaging, jpeg, keys,
+    adc, blocks, boot, clocks, display, dram, encoder, face, flash, h264, i2c, imaging, keys,
     lens, power, resets, sd, serial, shutter, statistics, sync, timer,
 };
 use fujimod_emulator::board::{
@@ -14,6 +14,7 @@ use fujimod_emulator_devices::{
     graph::{DeviceGraph, Mapping},
     signals::Level,
 };
+use fujimod_emulator_ip::jpeg;
 use fujimod_emulator_ip_arm::{gicv2, pl330};
 use serde::Deserialize;
 use serde_json::Value;
@@ -1060,7 +1061,13 @@ pub fn build(
             } => devices.register(
                 base,
                 jpeg::WINDOW,
-                Box::new(jpeg::Encoder::new(base, irq, run_ticks)?),
+                Box::new(jpeg::Encoder::new(
+                    "xpp-jpeg-encoder",
+                    base,
+                    irq,
+                    run_ticks,
+                    jpeg::Registers::LastWrite,
+                )?),
             )?,
             Model::JpegDecoder {
                 base,
@@ -1069,7 +1076,12 @@ pub fn build(
             } => devices.register(
                 base,
                 jpeg::WINDOW,
-                Box::new(jpeg::Decoder::new(base, irq, run_ticks)?),
+                Box::new(jpeg::Decoder::new(
+                    "xpp-jpeg-decoder",
+                    base,
+                    irq,
+                    run_ticks,
+                )?),
             )?,
             Model::H264 {
                 base,
