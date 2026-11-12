@@ -193,6 +193,7 @@ class emulator:
             definition: str,
             storage_image: SupportsGetItem[int, SupportsIndex] | None = None,
             card_files: Sequence[tuple[str, SupportsGetItem[int, SupportsIndex]]] = ...,
+            card_media: Sequence[tuple[int, emulator.CardMedium]] = ...,
         ) -> emulator.Board: ...
         def function_watch_begin(
             self,
@@ -593,6 +594,7 @@ class emulator:
 
     @final
     class Xp4:
+        def card_medium(self, /, host: SupportsIndex) -> emulator.CardMedium: ...
         def cpr_read(
             self,
             /,
